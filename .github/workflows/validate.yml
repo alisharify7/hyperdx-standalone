@@ -1,0 +1,24 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create CI environment file
+        run: cp .env.example .env
+
+      - name: Validate shell syntax
+        run: bash -n scripts/*.sh
+
+      - name: Validate Docker Compose
+        run: docker compose --env-file .env -f compose.yaml config --quiet

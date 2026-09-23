@@ -1,0 +1,45 @@
+name: ${COMPOSE_PROJECT_NAME:-hyperdx}
+
+services:
+  hyperdx:
+    image: ${CLICKSTACK_IMAGE:-clickhouse/clickstack-all-in-one:2.37.0}
+    container_name: ${CONTAINER_NAME:-hyperdx}
+    restart: unless-stopped
+
+    environment:
+      FRONTEND_URL: ${PUBLIC_URL:?PUBLIC_URL must be set in .env}
+      HYPERDX_APP_URL: ${PUBLIC_URL:?PUBLIC_URL must be set in .env}
+      EXPRESS_SESSION_SECRET: ${EXPRESS_SESSION_SECRET:?EXPRESS_SESSION_SECRET must be set in .env}
+      HYPERDX_LOG_LEVEL: ${HYPERDX_LOG_LEVEL:-info}
+      USAGE_STATS_ENABLED: ${USAGE_STATS_ENABLED:-true}
+
+    ports:
+      - "${UI_BIND_ADDRESS:-0.0.0.0}:${UI_PORT:-8080}:8080"
+      - "${OTLP_BIND_ADDRESS:-0.0.0.0}:${OTLP_GRPC_PORT:-4317}:4317"
+      - "${OTLP_BIND_ADDRESS:-0.0.0.0}:${OTLP_HTTP_PORT:-4318}:4318"
+      - "${CLICKHOUSE_BIND_ADDRESS:-127.0.0.1}:${CLICKHOUSE_HTTP_PORT:-8123}:8123"
+
+    volumes:
+      - "${DATA_DIR:-./volumes}/db:/data/db"
+      - "${DATA_DIR:-./volumes}/ch_data:/var/lib/clickhouse"
+      - "${DATA_DIR:-./volumes}/ch_logs:/var/log/clickhouse-server"
+
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+    stop_grace_period: 60s
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: ${DOCKER_LOG_MAX_SIZE:-20m}
+        max-file: "${DOCKER_LOG_MAX_FILE:-5}"
