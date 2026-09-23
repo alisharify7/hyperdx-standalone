@@ -6,3 +6,6 @@
 - OTLP ports (`4317` and `4318`) bind publicly by default. Restrict them with host firewall/security-group rules when remote ingestion is not required.
 - This repository does not configure TLS or a reverse proxy.
 - Keep the ClickStack image pinned and upgrade deliberately.
+- `make ttl` changes ClickHouse table definitions only after an explicit confirmation and saves pre-change DDL snapshots under `TTL_BACKUP_DIR`.
+- `MATERIALIZE TTL` can cause heavy ClickHouse merge/mutation activity. Use it only when immediate cleanup is required and the server has enough I/O/CPU headroom.
+- The TTL manager prefers `docker exec`, so ClickHouse does not need to be exposed publicly for retention management.

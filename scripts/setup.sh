@@ -38,11 +38,13 @@ get_env() {
 PUBLIC_URL="$(get_env PUBLIC_URL)"
 DATA_DIR="$(get_env DATA_DIR)"
 DATA_DIR="${DATA_DIR:-./volumes}"
+TTL_BACKUP_DIR="$(get_env TTL_BACKUP_DIR)"
+TTL_BACKUP_DIR="${TTL_BACKUP_DIR:-./backups/ttl}"
 
 [[ -n "$PUBLIC_URL" ]] || fail "PUBLIC_URL is empty in .env"
 [[ "$PUBLIC_URL" != */ ]] || fail "PUBLIC_URL must not end with a trailing slash"
 
-mkdir -p "$DATA_DIR/db" "$DATA_DIR/ch_data" "$DATA_DIR/ch_logs"
+mkdir -p "$DATA_DIR/db" "$DATA_DIR/ch_data" "$DATA_DIR/ch_logs" "$TTL_BACKUP_DIR"
 
 DC=(docker compose --env-file .env -f compose.yaml)
 

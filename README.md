@@ -1,8 +1,8 @@
 # HyperDX Standalone
 
-A minimal standalone Docker Compose setup for **HyperDX / ClickStack**.
+A production-oriented standalone Docker Compose setup for **HyperDX / ClickStack**.
 
-This repository has one purpose: **start HyperDX reliably and verify that it is healthy**. It does not bundle Caddy, Nginx, Traefik, TLS automation, DNS management, or any other web server/reverse proxy.
+This repository is intentionally focused on one job: **run HyperDX reliably, verify it, and provide a small local operations toolkit**. It does not bundle Caddy, Nginx, Traefik, TLS automation, DNS management, or another web server/reverse proxy.
 
 ## What it includes
 
@@ -14,6 +14,10 @@ This repository has one purpose: **start HyperDX reliably and verify that it is 
 - HyperDX UI availability check
 - ClickHouse availability check
 - Docker log rotation
+- Interactive operations menu
+- Runtime/resource/storage status report
+- HyperDX/ClickStack ClickHouse TTL and retention manager
+- Automatic DDL snapshots before TTL changes
 - Simple `make` commands
 - CI validation for shell scripts and Compose syntax
 
@@ -26,13 +30,20 @@ This repository has one purpose: **start HyperDX reliably and verify that it is 
 │   └── workflows/
 │       └── validate.yml
 ├── .gitignore
+├── backups/
+│   └── .gitkeep
 ├── compose.yaml
 ├── Makefile
 ├── README.md
 ├── SECURITY.md
 ├── scripts/
 │   ├── check.sh
-│   └── setup.sh
+│   ├── manage.sh
+│   ├── setup.sh
+│   ├── status.sh
+│   ├── ttl-manager.sh
+│   ├── ttl.sh
+│   └── wait-healthy.sh
 └── volumes/
     └── .gitkeep
 ```
@@ -42,6 +53,7 @@ This repository has one purpose: **start HyperDX reliably and verify that it is 
 - Linux server
 - Docker Engine
 - Docker Compose v2 (`docker compose`)
+- Bash 4+
 - At least 4 GB RAM and 2 CPU cores for basic/testing workloads
 
 ## Quick start
@@ -64,6 +76,12 @@ make setup
 8. Wait for the container health check to pass.
 9. Verify the HyperDX UI and ClickHouse are responding.
 
+After installation, the easiest entry point for routine operations is:
+
+```bash
+make manage
+```
+
 ## Configuration
 
 Copy and edit the example manually if you want to configure the deployment before first start:
@@ -84,7 +102,9 @@ OTLP_GRPC_PORT=4317
 OTLP_HTTP_PORT=4318
 CLICKHOUSE_BIND_ADDRESS=127.0.0.1
 CLICKHOUSE_HTTP_PORT=8123
+CLICKHOUSE_DATABASE=default
 DATA_DIR=./volumes
+TTL_BACKUP_DIR=./backups/ttl
 ```
 
 If HTTPS or a domain is handled elsewhere, set `PUBLIC_URL` to that external URL, for example:
@@ -96,11 +116,93 @@ UI_BIND_ADDRESS=127.0.0.1
 
 The reverse proxy itself is intentionally outside this repository.
 
+## Operations manager
+
+Run:
+
+```bash
+make manage
+```
+
+The menu provides:
+
+- full health check;
+- container/resource/storage status;
+- TTL/retention manager;
+- Compose container state;
+- recent logs;
+- live log follow;
+- restart + health verification; and
+- pull/recreate of the image configured in `.env` with explicit confirmation.
+
+No additional web panel or management service is exposed. The manager is a local shell tool.
+
+## TTL / retention manager
+
+Run the manager directly with:
+
+```bash
+make ttl
+```
+
+It discovers the standard HyperDX/ClickStack MergeTree tables and lets you:
+
+- list detected HyperDX tables and timestamp columns;
+- inspect current table-level TTL definitions;
+- view active parts, rows, size, expiration metadata, and expired parts;
+- apply/change one retention policy across all discovered HyperDX tables;
+- apply/change retention for one table only;
+- verify TTL definitions and ClickHouse part metadata; and
+- explicitly run `MATERIALIZE TTL` when immediate cleanup is required.
+
+Retention can be configured in **hours, days, weeks, or months**. For ClickStack tables partitioned by day, day/week/month retention is normally a better fit than hourly retention.
+
+Before changing table TTL definitions, the manager writes `SHOW CREATE TABLE` snapshots to:
+
+```text
+./backups/ttl/<UTC timestamp>/
+```
+
+or to the path configured by `TTL_BACKUP_DIR`.
+
+The normal TTL change only updates the table definition. Physical deletion is performed by ClickHouse background TTL merges. `MATERIALIZE TTL` is intentionally a separate action because it can create substantial merge/mutation I/O and CPU load.
+
+### TTL connection behavior
+
+The project wrapper automatically maps `.env` settings to the TTL manager:
+
+- `CONTAINER_NAME` -> ClickHouse Docker container
+- `CLICKHOUSE_HTTP_PORT` -> local HTTP fallback
+- `CLICKHOUSE_DATABASE` -> target ClickHouse database
+- `TTL_BACKUP_DIR` -> DDL snapshot directory
+
+The TTL manager normally uses `docker exec` first, so port `8123` can stay bound to localhost.
+
+## Status and storage
+
+Run:
+
+```bash
+make status
+```
+
+It reports:
+
+- container state and health;
+- configured image and restart count;
+- CPU/memory/network/block-I/O snapshot;
+- sizes of the persistent data/log directories;
+- ClickHouse table rows, active parts, and on-disk size; and
+- whether TTL is configured on the standard HyperDX tables.
+
 ## Commands
 
 ```bash
 make setup    # first setup + start + health verification
+make manage   # interactive operations menu
 make check    # verify HyperDX and ClickHouse
+make status   # resource, storage, table, and TTL summary
+make ttl      # interactive ClickHouse TTL/retention manager
 make up       # start HyperDX
 make down     # stop HyperDX
 make restart  # restart HyperDX

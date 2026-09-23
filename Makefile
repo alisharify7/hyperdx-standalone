@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 DC := docker compose --env-file .env -f compose.yaml
 
-.PHONY: help setup up down restart pull logs ps config check
+.PHONY: help setup up down restart pull logs ps config check status ttl manage
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "; printf "\nUsage:\n  make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -35,3 +35,12 @@ config: ## Validate/render Compose configuration
 
 check: ## Verify HyperDX and ClickHouse are responding
 	@./scripts/check.sh
+
+status: ## Show health, runtime resources, storage, tables, and TTL summary
+	@./scripts/status.sh
+
+ttl: ## Open the interactive ClickHouse TTL/retention manager
+	@./scripts/ttl.sh
+
+manage: ## Open the interactive HyperDX operations menu
+	@./scripts/manage.sh

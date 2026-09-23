@@ -17,3 +17,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local maintenance backups
+backups/*
+!backups/.gitkeep
